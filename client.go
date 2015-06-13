@@ -20,22 +20,22 @@ type Client struct {
 }
 
 func NewClient(conn net.Conn) *Client {
-	c := new(Client)
-	c.conn = conn
-	c.reader = bufio.NewReader(conn)
-	c.writer = bufio.NewWriter(conn)
-	c.write = make(chan string)
+	client := new(Client)
+	client.conn = conn
+	client.reader = bufio.NewReader(conn)
+	client.writer = bufio.NewWriter(conn)
+	client.write = make(chan string)
 
-	go c.WriteLines()
+	go client.WriteLines()
 
-	return c
+	return client
 }
 
-func (c *Client) ReadLines() <-chan string {
+func (client *Client) ReadLines() <-chan string {
 	ch := make(chan string)
 	go func() {
 		for {
-			line, err := c.reader.ReadString('\n')
+			line, err := client.reader.ReadString('\n')
 			if err != nil {
 				// TODO Handle the error properly.
 				log.Print(err)
@@ -48,17 +48,17 @@ func (c *Client) ReadLines() <-chan string {
 	return ch
 }
 
-func (c *Client) WriteLines() {
+func (client *Client) WriteLines() {
 	go func() {
-		for line := range c.write {
-			_, err := c.writer.WriteString(line)
+		for line := range client.write {
+			_, err := client.writer.WriteString(line)
 			if err != nil {
 				// TODO Handle the error properly.
 				log.Print(err)
 				break
 			}
-			c.writer.Flush()
+			client.writer.Flush()
 		}
-		c.quit <- 1
+		client.quit <- 1
 	}()
 }
