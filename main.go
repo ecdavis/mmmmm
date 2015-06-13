@@ -2,33 +2,60 @@ package main
 
 import (
 	"bufio"
-	"io"
 	"log"
 	"net"
 	)
 
-func echoConnection(conn net.Conn) {
-	rd := bufio.NewReader(conn)
-	w := bufio.NewWriter(conn)
-
-	for {
-		line, err := rd.ReadString('\n')
-		if err != nil {
-			log.Print("ReadString:", err)
-			break
-		}
-		_, err = w.WriteString(line)
-		if err != nil {
-			log.Print("WriteString:", err)
-			break
-		}
-		w.Flush()
-	}
-
-	conn.Close()
+type EchoClient struct {
+	conn net.Conn
+	reader *bufio.Reader
+	writer *bufio.Writer
+	writeChannel chan string
+	closeChannel chan bool
 }
 
-func echoServer() error {
+func NewEchoClient(conn net.Conn) (e *EchoClient) {
+	e = new(EchoClient)
+	e.conn = conn
+	e.reader = bufio.NewReader(conn)
+	e.writer = bufio.NewWriter(conn)
+	e.writeChannel = make(chan string)
+	e.closeChannel = make(chan bool)
+	return
+}
+
+func readLines(e *EchoClient) {
+	for {
+		line, err := e.reader.ReadString('\n')
+		if err != nil {
+			log.Print("readLines:", err)
+			close(e.writeChannel)
+			return
+		}
+		select {
+		case e.writeChannel <- line:
+			continue
+		case <- e.closeChannel:
+			close(e.writeChannel)
+			return
+		}
+	}
+}
+
+func writeLines(e *EchoClient) {
+	for line := range e.writeChannel {
+		_, err := e.writer.WriteString(line)
+		if err != nil {
+			log.Print("writeLines:", err)
+			break
+		}
+		e.writer.Flush()
+	}
+	e.closeChannel <- true
+	e.conn.Close()
+}
+
+func runServer() error {
 	ln, err := net.Listen("tcp", ":4040")
 	if err != nil {
 		return err
@@ -38,13 +65,15 @@ func echoServer() error {
 		if err != nil {
 			log.Print("Accept:", err)
 		}
-		go echoConnection(conn)
+		e := NewEchoClient(conn)
+		go readLines(e)
+		go writeLines(e)
 	}
 }
 
 func main() {
-	err := echoServer()
+	err := runServer()
 	if err != nil {
-		log.Fatal("echoServer:", err);
+		log.Fatal("runServer:", err);
 	}
 }
