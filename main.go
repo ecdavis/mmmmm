@@ -6,7 +6,11 @@ import (
 	"net"
 	)
 
-type EchoClient struct {
+var addChannel = make(chan *ChatClient)
+var removeChannel = make(chan *ChatClient)
+var chatChannel = make(chan string)
+
+type ChatClient struct {
 	conn net.Conn
 	reader *bufio.Reader
 	writer *bufio.Writer
@@ -14,45 +18,72 @@ type EchoClient struct {
 	closeChannel chan bool
 }
 
-func NewEchoClient(conn net.Conn) (e *EchoClient) {
-	e = new(EchoClient)
-	e.conn = conn
-	e.reader = bufio.NewReader(conn)
-	e.writer = bufio.NewWriter(conn)
-	e.writeChannel = make(chan string)
-	e.closeChannel = make(chan bool)
+func NewChatClient(conn net.Conn) (c *ChatClient) {
+	c = new(ChatClient)
+	c.conn = conn
+	c.reader = bufio.NewReader(conn)
+	c.writer = bufio.NewWriter(conn)
+	c.writeChannel = make(chan string)
+	c.closeChannel = make(chan bool)
 	return
 }
 
-func readLines(e *EchoClient) {
+func readLines(c *ChatClient) {
 	for {
-		line, err := e.reader.ReadString('\n')
+		line, err := c.reader.ReadString('\n')
 		if err != nil {
 			log.Print("readLines:", err)
-			close(e.writeChannel)
+			close(c.writeChannel)
+			<-c.closeChannel // Let the write goroutine exit. Could use a buffered close channel instead?
 			return
 		}
 		select {
-		case e.writeChannel <- line:
+		case chatChannel <- line:
 			continue
-		case <- e.closeChannel:
-			close(e.writeChannel)
+		case <-c.closeChannel: // If a write error occurred.
+			close(c.writeChannel)
 			return
 		}
 	}
 }
 
-func writeLines(e *EchoClient) {
-	for line := range e.writeChannel {
-		_, err := e.writer.WriteString(line)
+func writeLines(c *ChatClient) {
+	for line := range c.writeChannel {
+		_, err := c.writer.WriteString(line)
 		if err != nil {
 			log.Print("writeLines:", err)
 			break
 		}
-		e.writer.Flush()
+		c.writer.Flush()
 	}
-	e.closeChannel <- true
-	e.conn.Close()
+	c.closeChannel <- true
+	removeChannel <- c
+	c.conn.Close()
+}
+
+func processChatCommands() {
+	clients := make([]*ChatClient, 0)
+	for {
+		select {
+		case client := <-addChannel:
+			clients = append(clients, client)
+		case client := <-removeChannel:
+			found := -1
+			for i, v := range clients {
+				if v == client {
+					found = i
+					break
+				}
+			}
+			if found >= 0 {
+				clients = append(clients[:found], clients[found+1:]...)
+			}
+		case line := <-chatChannel:
+			for i := 0; i < len(clients); i++ {
+				clients[i].writeChannel <- line
+			}
+		}		
+	}
 }
 
 func runServer() error {
@@ -65,13 +96,15 @@ func runServer() error {
 		if err != nil {
 			log.Print("Accept:", err)
 		}
-		e := NewEchoClient(conn)
-		go readLines(e)
-		go writeLines(e)
+		c := NewChatClient(conn)
+		go readLines(c)
+		go writeLines(c)
+		addChannel <- c
 	}
 }
 
 func main() {
+	go processChatCommands()
 	err := runServer()
 	if err != nil {
 		log.Fatal("runServer:", err);
