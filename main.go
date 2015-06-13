@@ -1,88 +1,70 @@
 package main
 
 import (
-	"bufio"
 	"log"
 	"net"
-	)
+)
 
-var addChannel = make(chan *ChatClient)
-var removeChannel = make(chan *ChatClient)
+var addChannel = make(chan *Client)
+var removeChannel = make(chan *Client)
 var chatChannel = make(chan string)
+var clients = make([]*Client, 0)
 
-type ChatClient struct {
-	conn net.Conn
-	reader *bufio.Reader
-	writer *bufio.Writer
-	writeChannel chan string
-	closeChannel chan bool
-}
-
-func NewChatClient(conn net.Conn) (c *ChatClient) {
-	c = new(ChatClient)
-	c.conn = conn
-	c.reader = bufio.NewReader(conn)
-	c.writer = bufio.NewWriter(conn)
-	c.writeChannel = make(chan string)
-	c.closeChannel = make(chan bool)
-	return
-}
-
-func readLines(c *ChatClient) {
-	for {
-		line, err := c.reader.ReadString('\n')
-		if err != nil {
-			log.Print("readLines:", err)
-			close(c.writeChannel)
-			<-c.closeChannel // Let the write goroutine exit. Could use a buffered close channel instead?
-			return
+func addClient(c *Client) {
+	clients = append(clients, c)
+	go func() {
+		for {
+			// TODO Would be nice to use a range here if possible.
+			lines := c.ReadLines()
+			select {
+			case line, ok := <-lines:
+				if !ok {
+					removeChannel <- c
+					return
+				} else {
+					chatChannel <- line
+				}
+			case <-c.quit:
+				removeChannel <- c
+				return
+			}
 		}
-		select {
-		case chatChannel <- line:
-			continue
-		case <-c.closeChannel: // If a write error occurred.
-			close(c.writeChannel)
-			return
-		}
-	}
+	}()
 }
 
-func writeLines(c *ChatClient) {
-	for line := range c.writeChannel {
-		_, err := c.writer.WriteString(line)
-		if err != nil {
-			log.Print("writeLines:", err)
+func removeClient(c *Client) {
+	// TODO Super messy. Use a map instead, perhaps?
+	found := -1
+	for i, v := range clients {
+		if v == c {
+			found = i
 			break
 		}
-		c.writer.Flush()
 	}
-	c.closeChannel <- true
-	removeChannel <- c
-	c.conn.Close()
+	if found >= 0 {
+		clients = append(clients[:found], clients[found+1:]...)
+	}
+	// TODO Move this to a method on Client. Also need a way to close the
+	//      reader.
+	close(c.write)
+}
+
+func sendChatLine(line string) {
+	for i := 0; i < len(clients); i++ {
+		clients[i].write <- line
+	}
 }
 
 func processChatCommands() {
-	clients := make([]*ChatClient, 0)
 	for {
 		select {
 		case client := <-addChannel:
-			clients = append(clients, client)
+			addClient(client)
 		case client := <-removeChannel:
-			found := -1
-			for i, v := range clients {
-				if v == client {
-					found = i
-					break
-				}
-			}
-			if found >= 0 {
-				clients = append(clients[:found], clients[found+1:]...)
-			}
+			removeClient(client)
 		case line := <-chatChannel:
-			for i := 0; i < len(clients); i++ {
-				clients[i].writeChannel <- line
-			}
-		}		
+			sendChatLine(line)
+		}
 	}
 }
 
@@ -96,9 +78,7 @@ func runServer() error {
 		if err != nil {
 			log.Print("Accept:", err)
 		}
-		c := NewChatClient(conn)
-		go readLines(c)
-		go writeLines(c)
+		c := NewClient(conn)
 		addChannel <- c
 	}
 }
@@ -107,6 +87,6 @@ func main() {
 	go processChatCommands()
 	err := runServer()
 	if err != nil {
-		log.Fatal("runServer:", err);
+		log.Fatal("runServer:", err)
 	}
 }
