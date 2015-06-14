@@ -15,9 +15,6 @@ func NewClientManager() *ClientManager {
 	manager.remove = make(chan *Client)
 	manager.read = make(chan string)
 	manager.write = make(chan string)
-
-	go manager.ProcessCommands()
-
 	return manager
 }
 
@@ -32,7 +29,7 @@ func (manager *ClientManager) AddClient(client *Client) {
 					manager.remove <- client
 					return
 				} else {
-					manager.write <- line
+					manager.read <- line
 				}
 			case <-client.quit:
 				manager.remove <- client
@@ -65,13 +62,15 @@ func (manager *ClientManager) WriteLine(line string) {
 	}
 }
 
-func (manager *ClientManager) ProcessCommands() {
+func (manager *ClientManager) ProcessCommands(commands chan string) {
 	for {
 		select {
 		case client := <-manager.add:
 			manager.AddClient(client)
 		case client := <-manager.remove:
 			manager.RemoveClient(client)
+		case line := <-manager.read:
+			commands <- line
 		case line := <-manager.write:
 			manager.WriteLine(line)
 		}

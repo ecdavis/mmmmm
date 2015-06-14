@@ -22,6 +22,14 @@ func runServer(manager *ClientManager) error {
 
 func main() {
 	manager := NewClientManager()
+
+	ch := make(chan string)
+	go func() {
+		for {
+			manager.write <- <-ch
+		}
+	}()
+	go manager.ProcessCommands(ch)
 	err := runServer(manager)
 	if err != nil {
 		log.Fatal("runServer:", err)
