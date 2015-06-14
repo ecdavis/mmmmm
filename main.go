@@ -5,7 +5,7 @@ import (
 	"net"
 )
 
-func runServer(manager *ClientManager) error {
+func runServer(manager *SessionManager) error {
 	ln, err := net.Listen("tcp", ":4040")
 	if err != nil {
 		return err
@@ -15,13 +15,13 @@ func runServer(manager *ClientManager) error {
 		if err != nil {
 			log.Print("Accept:", err)
 		}
-		client := NewClient(conn)
-		manager.add <- client
+		session := NewSession(conn)
+		manager.add <- session
 	}
 }
 
 func main() {
-	manager := NewClientManager()
+	manager := NewSessionManager()
 
 	ch := make(chan string)
 	go func() {
