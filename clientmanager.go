@@ -52,10 +52,10 @@ func (manager *ClientManager) RemoveClient(client *Client) {
 		}
 	}
 	if found >= 0 {
+		// TODO There may be a memory leak here, see: https://github.com/golang/go/wiki/SliceTricks
 		manager.clients = append(manager.clients[:found], manager.clients[found+1:]...)
 	}
-	// TODO Move this to a method on Client. Also need a way to close the
-	//      reader.
+	// TODO Move this to a method on Client. Also need a way to close the reader.
 	close(client.write)
 }
 
