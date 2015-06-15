@@ -20,6 +20,11 @@ type Session struct {
 	quit   chan int
 }
 
+type SessionInput struct {
+	session *Session
+	input   string
+}
+
 func NewSession(conn net.Conn) *Session {
 	session := new(Session)
 	session.conn = conn
@@ -32,8 +37,8 @@ func NewSession(conn net.Conn) *Session {
 	return session
 }
 
-func (session *Session) ReadLines() <-chan string {
-	ch := make(chan string)
+func (session *Session) ReadLines() <-chan *SessionInput {
+	ch := make(chan *SessionInput)
 	go func() {
 		for {
 			line, err := session.reader.ReadString('\n')
@@ -42,7 +47,7 @@ func (session *Session) ReadLines() <-chan string {
 				log.Print(err)
 				break
 			}
-			ch <- line
+			ch <- &SessionInput{session, line}
 		}
 		close(ch)
 	}()

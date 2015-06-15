@@ -2,10 +2,10 @@ package main
 
 type SessionManager struct {
 	sessions []*Session
-	add     chan *Session
-	remove  chan *Session
-	read    chan string
-	write   chan string
+	add      chan *Session
+	remove   chan *Session
+	read     chan *SessionInput
+	write    chan string
 }
 
 func NewSessionManager() *SessionManager {
@@ -13,7 +13,7 @@ func NewSessionManager() *SessionManager {
 	manager.sessions = make([]*Session, 0)
 	manager.add = make(chan *Session)
 	manager.remove = make(chan *Session)
-	manager.read = make(chan string)
+	manager.read = make(chan *SessionInput)
 	manager.write = make(chan string)
 	return manager
 }
@@ -21,15 +21,15 @@ func NewSessionManager() *SessionManager {
 func (manager *SessionManager) AddSession(session *Session) {
 	manager.sessions = append(manager.sessions, session)
 	go func() {
-		lines := session.ReadLines()
+		sis := session.ReadLines()
 		for {
 			select {
-			case line, ok := <-lines:
+			case si, ok := <-sis:
 				if !ok {
 					manager.remove <- session
 					return
 				} else {
-					manager.read <- line
+					manager.read <- si
 				}
 			case <-session.quit:
 				manager.remove <- session
@@ -63,15 +63,15 @@ func (manager *SessionManager) WriteLine(line string) {
 }
 
 // TODO Make this return a channel rather than passing one in?
-func (manager *SessionManager) ProcessCommands(commands chan string) {
+func (manager *SessionManager) ProcessCommands(sis chan *SessionInput) {
 	for {
 		select {
 		case session := <-manager.add:
 			manager.AddSession(session)
 		case session := <-manager.remove:
 			manager.RemoveSession(session)
-		case line := <-manager.read:
-			commands <- line
+		case si := <-manager.read:
+			sis <- si
 		case line := <-manager.write:
 			manager.WriteLine(line)
 		}
