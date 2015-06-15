@@ -5,15 +5,15 @@ import (
 	"net"
 )
 
-var inputHandlerStack = make([]func(*SessionManager, *SessionInput), 0)
+var inputHandlerStack = make([]func(*Game, *SessionInput), 0)
 
-func handleInput(manager *SessionManager, sisChannel chan *SessionInput) {
+func handleInput(game *Game, sisChannel chan *SessionInput) {
 	for si := range sisChannel {
-		inputHandlerStack[len(inputHandlerStack)-1](manager, si)
+		inputHandlerStack[len(inputHandlerStack)-1](game, si)
 	}
 }
 
-func runServer(manager *SessionManager) error {
+func runServer(game *Game) error {
 	ln, err := net.Listen("tcp", ":4040")
 	if err != nil {
 		return err
@@ -24,7 +24,7 @@ func runServer(manager *SessionManager) error {
 			log.Print("Accept:", err)
 		}
 		session := NewSession(conn)
-		manager.add <- session
+		game.add <- session
 	}
 }
 
@@ -33,11 +33,11 @@ func main() {
 
 	inputHandlerStack = append(inputHandlerStack, HandleCommand)
 
-	manager := NewSessionManager()
-	go manager.ProcessCommands(ch)
-	go handleInput(manager, ch)
+	game := NewGame()
+	go game.ProcessCommands(ch)
+	go handleInput(game, ch)
 
-	err := runServer(manager)
+	err := runServer(game)
 	if err != nil {
 		log.Fatal("runServer:", err)
 	}
