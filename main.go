@@ -24,7 +24,7 @@ func runServer(game *Game) error {
 			log.Print("Accept:", err)
 		}
 		session := NewSession(conn)
-		game.add <- session
+		game.tasks <- func(game *Game) { game.AddSession(session) }
 	}
 }
 
@@ -34,7 +34,7 @@ func main() {
 	inputHandlerStack = append(inputHandlerStack, HandleCommand)
 
 	game := NewGame()
-	go game.ProcessCommands(ch)
+	go game.ProcessTasks(ch)
 	go handleInput(game, ch)
 
 	err := runServer(game)

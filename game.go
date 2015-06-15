@@ -2,19 +2,15 @@ package main
 
 type Game struct {
 	sessions []*Session
-	add      chan *Session
-	remove   chan *Session
 	read     chan *SessionInput
-	write    chan string
+	tasks    chan func(*Game)
 }
 
 func NewGame() *Game {
 	game := new(Game)
 	game.sessions = make([]*Session, 0)
-	game.add = make(chan *Session)
-	game.remove = make(chan *Session)
 	game.read = make(chan *SessionInput)
-	game.write = make(chan string)
+	game.tasks = make(chan func(*Game))
 	return game
 }
 
@@ -26,13 +22,13 @@ func (game *Game) AddSession(session *Session) {
 			select {
 			case si, ok := <-sis:
 				if !ok {
-					game.remove <- session
+					game.tasks <- func(game *Game) { game.RemoveSession(session) }
 					return
 				} else {
 					game.read <- si
 				}
 			case <-session.quit:
-				game.remove <- session
+				game.tasks <- func(game *Game) { game.RemoveSession(session) }
 				return
 			}
 		}
@@ -56,24 +52,14 @@ func (game *Game) RemoveSession(session *Session) {
 	close(session.write)
 }
 
-func (game *Game) WriteLine(line string) {
-	for i := 0; i < len(game.sessions); i++ {
-		game.sessions[i].write <- line
-	}
-}
-
 // TODO Make this return a channel rather than passing one in?
-func (game *Game) ProcessCommands(sis chan *SessionInput) {
+func (game *Game) ProcessTasks(sis chan *SessionInput) {
 	for {
 		select {
-		case session := <-game.add:
-			game.AddSession(session)
-		case session := <-game.remove:
-			game.RemoveSession(session)
 		case si := <-game.read:
 			sis <- si
-		case line := <-game.write:
-			game.WriteLine(line)
+		case task := <-game.tasks:
+			task(game)
 		}
 	}
 }
