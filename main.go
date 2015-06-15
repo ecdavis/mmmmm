@@ -5,7 +5,7 @@ import (
 	"net"
 )
 
-var inputHandlerStack = make([]func(*Game, *SessionInput), 0)
+var inputHandlerStack = make([]func(*Game, *User, string), 0)
 
 func runServer(game *Game) error {
 	ln, err := net.Listen("tcp", ":4040")

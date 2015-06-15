@@ -2,9 +2,9 @@ package main
 
 import "strings"
 
-func HandleCommand(game *Game, si *SessionInput) {
-	args := strings.Split(si.input, " ")
+func HandleCommand(game *Game, user *User, input string) {
+	args := strings.Split(input, " ")
 	c, a := args[0], strings.Join(args[1:], " ")
-	si.session.write <- (c + "\r\n")
+	user.session.write <- (c + "\r\n")
 	println(a)
 }
