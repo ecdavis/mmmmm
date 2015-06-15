@@ -2,19 +2,29 @@ package main
 
 type Game struct {
 	sessions []*Session
-	read     chan *SessionInput
 	tasks    chan func(*Game)
 }
 
 func NewGame() *Game {
 	game := new(Game)
 	game.sessions = make([]*Session, 0)
-	game.read = make(chan *SessionInput)
 	game.tasks = make(chan func(*Game))
 	return game
 }
 
 func (game *Game) AddSession(session *Session) {
+	game.tasks <- func(game *Game) { game.addSession(session) }
+}
+
+func (game *Game) RemoveSession(session *Session) {
+	game.tasks <- func(game *Game) { game.removeSession(session) }
+}
+
+func (game *Game) HandleSessionInput(input *SessionInput) {
+	game.tasks <- func(game *Game) { inputHandlerStack[len(inputHandlerStack)-1](game, input) }
+}
+
+func (game *Game) addSession(session *Session) {
 	game.sessions = append(game.sessions, session)
 	go func() {
 		sis := session.ReadLines()
@@ -22,20 +32,20 @@ func (game *Game) AddSession(session *Session) {
 			select {
 			case si, ok := <-sis:
 				if !ok {
-					game.tasks <- func(game *Game) { game.RemoveSession(session) }
+					game.RemoveSession(session)
 					return
 				} else {
-					game.read <- si
+					game.HandleSessionInput(si)
 				}
 			case <-session.quit:
-				game.tasks <- func(game *Game) { game.RemoveSession(session) }
+				game.RemoveSession(session)
 				return
 			}
 		}
 	}()
 }
 
-func (game *Game) RemoveSession(session *Session) {
+func (game *Game) removeSession(session *Session) {
 	// TODO Super messy. Use a map instead, perhaps?
 	found := -1
 	for i, c := range game.sessions {
@@ -52,14 +62,8 @@ func (game *Game) RemoveSession(session *Session) {
 	close(session.write)
 }
 
-// TODO Make this return a channel rather than passing one in?
-func (game *Game) ProcessTasks(sis chan *SessionInput) {
-	for {
-		select {
-		case si := <-game.read:
-			sis <- si
-		case task := <-game.tasks:
-			task(game)
-		}
+func (game *Game) ProcessTasks() {
+	for task := range game.tasks {
+		task(game)
 	}
 }

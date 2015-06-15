@@ -7,12 +7,6 @@ import (
 
 var inputHandlerStack = make([]func(*Game, *SessionInput), 0)
 
-func handleInput(game *Game, sisChannel chan *SessionInput) {
-	for si := range sisChannel {
-		inputHandlerStack[len(inputHandlerStack)-1](game, si)
-	}
-}
-
 func runServer(game *Game) error {
 	ln, err := net.Listen("tcp", ":4040")
 	if err != nil {
@@ -23,19 +17,15 @@ func runServer(game *Game) error {
 		if err != nil {
 			log.Print("Accept:", err)
 		}
-		session := NewSession(conn)
-		game.tasks <- func(game *Game) { game.AddSession(session) }
+		game.AddSession(NewSession(conn))
 	}
 }
 
 func main() {
-	ch := make(chan *SessionInput)
-
 	inputHandlerStack = append(inputHandlerStack, HandleCommand)
 
 	game := NewGame()
-	go game.ProcessTasks(ch)
-	go handleInput(game, ch)
+	go game.ProcessTasks()
 
 	err := runServer(game)
 	if err != nil {
