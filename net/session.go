@@ -1,4 +1,4 @@
-package main
+package net
 
 import (
 	"bufio"
@@ -17,13 +17,13 @@ type Session struct {
 	conn   net.Conn
 	reader *bufio.Reader
 	writer *bufio.Writer
-	write  chan string
-	quit   chan int
+	Write  chan string
+	Quit   chan int
 }
 
 type SessionInput struct {
-	session *Session
-	input   string
+	Session *Session
+	Input   string
 }
 
 func NewSession(conn net.Conn) *Session {
@@ -31,7 +31,7 @@ func NewSession(conn net.Conn) *Session {
 	session.conn = conn
 	session.reader = bufio.NewReader(conn)
 	session.writer = bufio.NewWriter(conn)
-	session.write = make(chan string)
+	session.Write = make(chan string)
 
 	go session.WriteLines()
 
@@ -58,7 +58,7 @@ func (session *Session) ReadLines() <-chan *SessionInput {
 
 func (session *Session) WriteLines() {
 	go func() {
-		for line := range session.write {
+		for line := range session.Write {
 			_, err := session.writer.WriteString(line)
 			if err != nil {
 				// TODO Handle the error properly.
@@ -67,6 +67,6 @@ func (session *Session) WriteLines() {
 			}
 			session.writer.Flush()
 		}
-		session.quit <- 1
+		session.Quit <- 1
 	}()
 }

@@ -1,13 +1,15 @@
 package main
 
+import "github.com/ecdavis/mmmmm/net"
+
 type InputHandler func(*Game, *User, string)
 
 type User struct {
-	session       *Session
+	session       *net.Session
 	inputHandlers []InputHandler
 }
 
-func NewUser(session *Session) *User {
+func NewUser(session *net.Session) *User {
 	user := new(User)
 	user.session = session
 	user.inputHandlers = make([]InputHandler, 0)
@@ -20,32 +22,32 @@ func (user *User) HandleInput(game *Game, input string) {
 }
 
 type Game struct {
-	users map[*Session]*User
+	users map[*net.Session]*User
 	tasks chan func(*Game)
 }
 
 func NewGame() *Game {
 	game := new(Game)
-	game.users = make(map[*Session]*User)
+	game.users = make(map[*net.Session]*User)
 	game.tasks = make(chan func(*Game))
 	return game
 }
 
-func (game *Game) AddSession(session *Session) {
+func (game *Game) AddSession(session *net.Session) {
 	game.tasks <- func(game *Game) {
 		game.addUser(NewUser(session))
 	}
 }
 
-func (game *Game) RemoveSession(session *Session) {
+func (game *Game) RemoveSession(session *net.Session) {
 	game.tasks <- func(game *Game) {
 		game.removeUser(game.users[session])
 	}
 }
 
-func (game *Game) HandleSessionInput(input *SessionInput) {
+func (game *Game) HandleSessionInput(input *net.SessionInput) {
 	game.tasks <- func(game *Game) {
-		game.users[input.session].HandleInput(game, input.input)
+		game.users[input.Session].HandleInput(game, input.Input)
 	}
 }
 
@@ -62,7 +64,7 @@ func (game *Game) addUser(user *User) {
 				} else {
 					game.HandleSessionInput(sessionInput)
 				}
-			case <-user.session.quit:
+			case <-user.session.Quit:
 				game.RemoveSession(user.session)
 				return
 			}
@@ -73,7 +75,7 @@ func (game *Game) addUser(user *User) {
 func (game *Game) removeUser(user *User) {
 	delete(game.users, user.session)
 	// TODO Move this to a method on Session or User. Also need a way to close the reader.
-	close(user.session.write)
+	close(user.session.Write)
 }
 
 func (game *Game) ProcessTasks() {

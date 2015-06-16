@@ -3,32 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
-	"net"
 	"strings"
+	"github.com/ecdavis/mmmmm/net"
 )
 
 func think(user *User, cmd string, args []string) {
-	user.session.write <- fmt.Sprintf("You think, '%s'\r\n", strings.Join(args, " "))
-}
-
-func runServer() (<-chan *Session, error) {
-	ln, err := net.Listen("tcp", ":4040")
-	if err != nil {
-		return nil, err
-	}
-	ch := make(chan *Session)
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				log.Print("Accept:", err)
-				continue
-			}
-			ch <- NewSession(conn)
-		}
-		close(ch)
-	}()
-	return ch, nil
+	user.session.Write <- fmt.Sprintf("You think, '%s'\r\n", strings.Join(args, " "))
 }
 
 func main() {
@@ -36,7 +16,7 @@ func main() {
 
 	game := NewGame()
 
-	sessions, err := runServer()
+	sessions, err := net.RunServer()
 	if err != nil {
 		log.Fatal("runServer:", err)
 	}
