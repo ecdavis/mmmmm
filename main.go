@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/ecdavis/mmmmm/net"
 	"log"
 	"strings"
-	"github.com/ecdavis/mmmmm/net"
 )
 
 func think(user *User, cmd string, args []string) {
