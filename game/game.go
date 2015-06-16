@@ -1,24 +1,26 @@
-package main
+package game
 
-import "github.com/ecdavis/mmmmm/net"
+import (
+	"github.com/ecdavis/mmmmm/hooks"
+	"github.com/ecdavis/mmmmm/net"
+	)
 
 type InputHandler func(*Game, *User, string)
 
 type User struct {
-	session       *net.Session
-	inputHandlers []InputHandler
+	Session       *net.Session
+	InputHandlers []InputHandler
 }
 
 func NewUser(session *net.Session) *User {
 	user := new(User)
-	user.session = session
-	user.inputHandlers = make([]InputHandler, 0)
-	user.inputHandlers = append(user.inputHandlers, HandleCommand)
+	user.Session = session
+	user.InputHandlers = make([]InputHandler, 0)
 	return user
 }
 
 func (user *User) HandleInput(game *Game, input string) {
-	user.inputHandlers[len(user.inputHandlers)-1](game, user, input)
+	user.InputHandlers[len(user.InputHandlers)-1](game, user, input)
 }
 
 type Game struct {
@@ -52,30 +54,31 @@ func (game *Game) HandleSessionInput(input *net.SessionInput) {
 }
 
 func (game *Game) addUser(user *User) {
-	game.users[user.session] = user
+	game.users[user.Session] = user
 	go func() {
-		sessionInputs := user.session.ReadLines()
+		sessionInputs := user.Session.ReadLines()
 		for {
 			select {
 			case sessionInput, ok := <-sessionInputs:
 				if !ok {
-					game.RemoveSession(user.session)
+					game.RemoveSession(user.Session)
 					return
 				} else {
 					game.HandleSessionInput(sessionInput)
 				}
-			case <-user.session.Quit:
-				game.RemoveSession(user.session)
+			case <-user.Session.Quit:
+				game.RemoveSession(user.Session)
 				return
 			}
 		}
 	}()
+	hooks.Run("addUser", user)
 }
 
 func (game *Game) removeUser(user *User) {
-	delete(game.users, user.session)
+	delete(game.users, user.Session)
 	// TODO Move this to a method on Session or User. Also need a way to close the reader.
-	close(user.session.Write)
+	close(user.Session.Write)
 }
 
 func (game *Game) ProcessTasks() {

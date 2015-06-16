@@ -1,20 +1,23 @@
 package hooks
 
-type Hook func(...interface{})
+type Hook func(...interface{}) error
 
 var hooks = make(map[string][]Hook)
 
 func Add(name string, hook Hook) {
-	list, ok := hooks[name]
+	_, ok := hooks[name]
 	if !ok {
-		list = make([]Hook, 0)
+		hooks[name] = make([]Hook, 0)
 	}
-	list = append(list, hook)
-	hooks[name] = list
+	hooks[name] = append(hooks[name], hook)
 }
 
-func Run(name string, args ...interface{}) {
+func Run(name string, args ...interface{}) error {
 	for _, hook := range(hooks[name]) {
-		hook(args)
+		err := hook(args...)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
