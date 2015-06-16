@@ -30,8 +30,9 @@ func onAddUser(args ...interface{}) error {
 	return nil
 }
 
-func think(user *game.User, cmd string, args []string) {
+func think(user *game.User, cmd string, args []string) error {
 	user.Session.Write <- fmt.Sprintf("You think, '%s'\r\n", strings.Join(args, " "))
+	return nil
 }
 
 func main() {

@@ -5,7 +5,7 @@ import (
 	"github.com/ecdavis/mmmmm/game"
 )
 
-type Command func(*game.User, string, []string)
+type Command func(*game.User, string, []string) error
 
 var commands = make(map[string]Command)
 
@@ -23,6 +23,5 @@ func Run(user *game.User, cmd string, args []string) error {
 	if !ok {
 		return errors.New("command does not exist")
 	}
-	command(user, cmd, args)
-	return nil
+	return command(user, cmd, args)
 }
