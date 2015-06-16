@@ -1,14 +1,16 @@
 package main
 
+type InputHandler func(*Game, *User, string)
+
 type User struct {
 	session       *Session
-	inputHandlers []func(*Game, *User, string)
+	inputHandlers []InputHandler
 }
 
 func NewUser(session *Session) *User {
 	user := new(User)
 	user.session = session
-	user.inputHandlers = make([]func(*Game, *User, string), 0)
+	user.inputHandlers = make([]InputHandler, 0)
 	user.inputHandlers = append(user.inputHandlers, HandleCommand)
 	return user
 }

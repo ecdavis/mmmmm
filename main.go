@@ -11,32 +11,38 @@ func think(user *User, cmd string, args []string) {
 	user.session.write <- fmt.Sprintf("You think, '%s'\r\n", strings.Join(args, " "))
 }
 
-var inputHandlerStack = make([]func(*Game, *User, string), 0)
-
-func runServer(game *Game) error {
+func runServer() (<-chan *Session, error) {
 	ln, err := net.Listen("tcp", ":4040")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			log.Print("Accept:", err)
+	ch := make(chan *Session)
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				log.Print("Accept:", err)
+				continue
+			}
+			ch <- NewSession(conn)
 		}
-		game.AddSession(NewSession(conn))
-	}
+		close(ch)
+	}()
+	return ch, nil
 }
 
 func main() {
 	AddCommand("think", think)
 
-	inputHandlerStack = append(inputHandlerStack, HandleCommand)
-
 	game := NewGame()
-	go game.ProcessTasks()
 
-	err := runServer(game)
+	sessions, err := runServer()
 	if err != nil {
 		log.Fatal("runServer:", err)
 	}
+	go func() {
+		game.AddSession(<-sessions)
+	}()
+
+	game.ProcessTasks()
 }
