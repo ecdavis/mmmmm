@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"log"
 	"net"
+	"strings"
 )
 
 // TODO There are currently two separate ways of knowing a session is closed.
@@ -47,6 +48,7 @@ func (session *Session) ReadLines() <-chan *SessionInput {
 				log.Print(err)
 				break
 			}
+			line = strings.TrimRight(line, "\r\n")
 			ch <- &SessionInput{session, line}
 		}
 		close(ch)

@@ -1,9 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
+	"strings"
 )
+
+func think(user *User, cmd string, args []string) {
+	user.session.write <- fmt.Sprintf("You think, '%s'\r\n", strings.Join(args, " "))
+}
 
 var inputHandlerStack = make([]func(*Game, *User, string), 0)
 
@@ -22,6 +28,8 @@ func runServer(game *Game) error {
 }
 
 func main() {
+	AddCommand("think", think)
+
 	inputHandlerStack = append(inputHandlerStack, HandleCommand)
 
 	game := NewGame()
